@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1078175017564",
+    "project_id": "zenflector-9bbba",
+    "storage_bucket": "zenflector-9bbba.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1078175017564:android:13fbb99d6c3aadfec8d499",
+        "android_client_info": {
+          "package_name": "zenflector.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCAzqRinmL47GMIkc-A_PG94TbWg65inws"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
