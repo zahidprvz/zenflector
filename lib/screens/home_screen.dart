@@ -10,9 +10,10 @@ import 'package:zenflector/providers/favorites_provider.dart';
 import 'package:zenflector/providers/genre_provider.dart';
 import 'package:zenflector/screens/audio_player_screen.dart';
 import 'package:zenflector/screens/genre_screen.dart';
+import 'package:zenflector/screens/search_screen.dart'; // Import SearchScreen
 import 'package:zenflector/utils/constants.dart';
 import 'package:zenflector/components/genre_card.dart';
-import 'package:zenflector/widgets/audio_list_item.dart';
+import 'package:zenflector/widgets/audio_list_item.dart'; // Import AudioListItem
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -54,6 +55,18 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('ZenFlector'),
         centerTitle: true,
         actions: [
+          // Search Icon
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) =>
+                        const SearchScreen()), // Navigate to SearchScreen
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
@@ -131,7 +144,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               const SectionHeader(title: "Categories"),
               SizedBox(
-                height: 170,
+                height: 170, // Keep fixed height
                 child: PageView.builder(
                   controller: PageController(viewportFraction: 0.85),
                   itemCount: genreProvider.genres.length,
@@ -167,7 +180,7 @@ class _HomeScreenState extends State<HomeScreen> {
     AuthProvider authProvider,
   ) {
     return FutureBuilder(
-      future: _favoritesFuture, // Wait for favorites to load
+      future: _favoritesFuture, // Use FutureBuilder for favorites
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -175,11 +188,12 @@ class _HomeScreenState extends State<HomeScreen> {
           return Center(child: Text("Error: ${snapshot.error}"));
         } else {
           return Consumer<FavoritesProvider>(
+            // Use Consumer for Favorites
             builder: (context, favoritesProvider, child) {
-              // Get favorite audios, limit to 5, handle null safely
               final List<Audio> favoriteAudios =
                   favoritesProvider.favoriteAudios ?? [];
-              final List<Audio> displayAudios = favoriteAudios.take(5).toList();
+              final List<Audio> displayAudios =
+                  favoriteAudios.take(5).toList(); // Limit to 5
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -204,7 +218,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             vertical: AppConstants.defaultPadding / 2,
                           ),
                           child: AudioListItem(
-                            // Use AudioListItem instead of AudioCard
+                            // Use AudioListItem, not AudioCard
                             audio: audio,
                             isPlaying: audioPlayerProvider.currentAudio?.id ==
                                     audio.id &&
@@ -212,8 +226,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             isFavorite: favoritesProvider
                                 .isFavorite(audio), // This is correct now
                             onFavoritePressed: () {
-                              favoritesProvider.toggleFavorite(audio,
-                                  authProvider.currentUser?.uid); // Correct
+                              favoritesProvider.toggleFavorite(
+                                  audio, authProvider.currentUser?.uid);
                             },
                             onTap: () {
                               audioPlayerProvider.playAudio(audio);

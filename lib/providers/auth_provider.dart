@@ -51,6 +51,39 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  // Method to update the user's profile
+  Future<void> updateProfile(
+      {String? name, Uint8List? imageBytes, String? imageName}) async {
+    if (_currentUser == null) {
+      throw Exception("User not logged in");
+    }
+
+    String? photoURL;
+
+    // 1. Upload image (if provided)
+    if (imageBytes != null) {
+      photoURL = await _firebaseService.uploadProfileImage(_currentUser!.uid,
+          imageBytes, imageName!); // Use ! since we check for null above
+      if (photoURL == null) {
+        throw Exception("Image upload failed");
+      }
+    }
+
+    // 2. Create an updated User object (using copyWith).  VERY IMPORTANT.
+    User updatedUser = _currentUser!.copyWith(
+      name: name,
+      photoURL: photoURL ??
+          _currentUser?.photoURL, // Keep existing URL if no new image
+    );
+
+    // 3. Update Firestore
+    await _firebaseService.updateUser(updatedUser);
+
+    // 4. Update local state
+    _currentUser = updatedUser;
+    notifyListeners(); // Notify listeners AFTER successful update
+  }
+
   // Modified signUpWithEmailAndPassword
   Future<void> signUpWithEmailAndPassword(
     String email,
@@ -101,5 +134,6 @@ class AuthProvider with ChangeNotifier {
 
   Future<void> signOut() async {
     await _auth.signOut();
+    // Data clearing now happens in the authStateChanges listener
   }
 }

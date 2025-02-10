@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart'; // Import url_launcher
 import 'package:zenflector/providers/app_settings_provider.dart';
 import 'package:zenflector/providers/auth_provider.dart';
+import 'package:zenflector/screens/profile_screen.dart';
 import 'package:zenflector/utils/constants.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -100,7 +101,11 @@ class _SettingsScreenState extends State<SettingsScreen>
             title: const Text('Account'),
             subtitle: Text(authProvider.currentUser?.email ?? 'Not logged in'),
             onTap: () {
-              // TODO: Navigate to an account details/edit screen
+              // Navigate to Profile Screen
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+              );
             },
           ),
           const Divider(),
