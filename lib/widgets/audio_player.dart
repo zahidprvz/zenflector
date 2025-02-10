@@ -2,7 +2,7 @@ import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:just_audio_background/just_audio_background.dart'; // Import
+import 'package:just_audio_background/just_audio_background.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:zenflector/models/audio.dart';
 import 'package:zenflector/utils/constants.dart';
@@ -10,82 +10,90 @@ import 'package:zenflector/widgets/seek_bar.dart';
 
 class AudioPlayerWidget extends StatefulWidget {
   final Audio audio;
-  final VoidCallback onDispose;
 
-  const AudioPlayerWidget(
-      {super.key, required this.audio, required this.onDispose});
+  const AudioPlayerWidget({super.key, required this.audio});
 
   @override
   _AudioPlayerWidgetState createState() => _AudioPlayerWidgetState();
 }
 
 class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
-    with WidgetsBindingObserver {
-  late AudioPlayer _audioPlayer;
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+  late final AudioPlayer _audioPlayer = AudioPlayer();
+  late AnimationController _animationController;
+  late Animation<double> _playPauseAnimation;
+  bool _wasPlayingBeforePause = false; // ✅ Declared this variable
 
+  // ✅ Custom clampDuration method
+  Duration clampDuration(Duration value, Duration min, Duration max) {
+    if (value < min) return min;
+    if (value > max) return max;
+    return value;
+  }
+
+  // ✅ Updated Position Data Stream
   Stream<PositionData> get _positionDataStream =>
       Rx.combineLatest3<Duration, Duration, Duration?, PositionData>(
-          _audioPlayer.positionStream,
-          _audioPlayer.bufferedPositionStream,
-          _audioPlayer.durationStream,
-          (position, bufferedPosition, duration) => PositionData(
-              position, bufferedPosition, duration ?? Duration.zero));
+        _audioPlayer.positionStream,
+        _audioPlayer.bufferedPositionStream,
+        _audioPlayer.durationStream,
+        (position, bufferedPosition, duration) {
+          duration ??= Duration.zero;
+
+          // Clamping position and buffered position
+          position = clampDuration(position, Duration.zero, duration);
+          bufferedPosition =
+              clampDuration(bufferedPosition, Duration.zero, duration);
+
+          return PositionData(position, bufferedPosition, duration);
+        },
+      );
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _audioPlayer = AudioPlayer();
     _initAudioPlayer();
+
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+
+    _playPauseAnimation =
+        Tween<double>(begin: 0, end: 1).animate(_animationController);
+
+    _audioPlayer.playerStateStream.listen((state) {
+      if (state.playing) {
+        _animationController.forward();
+      } else {
+        _animationController.reverse();
+      }
+    });
   }
 
   Future<void> _initAudioPlayer() async {
     final session = await AudioSession.instance;
     await session.configure(const AudioSessionConfiguration.music());
 
-    _audioPlayer.playbackEventStream.listen((event) {},
-        onError: (Object e, StackTrace stackTrace) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text('An error occurred during playback: $e'),
-            backgroundColor: AppColors.error),
-      );
-      print('A stream error occurred: $e');
-    });
-
     try {
-      // Use setAudioSource and MediaItem for background support
       await _audioPlayer.setAudioSource(AudioSource.uri(
         Uri.parse(widget.audio.fileUrl),
         tag: MediaItem(
-            // Use MediaItem
-            id: widget.audio.id,
-            title: widget.audio.title,
-            artist: widget.audio.artist,
-            artUri: widget.audio.imageUrl != null
-                ? Uri.parse(widget.audio.imageUrl!)
-                : null, // Set art URI
-            duration: Duration(seconds: widget.audio.duration)),
+          id: widget.audio.id,
+          title: widget.audio.title,
+          artist: widget.audio.artist,
+          artUri: widget.audio.imageUrl != null
+              ? Uri.parse(widget.audio.imageUrl!)
+              : null,
+          duration: Duration(seconds: widget.audio.duration),
+        ),
       ));
-    } on PlayerException catch (e) {
-      // ... (same error handling as before) ...
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('PlayerException: ${e.message} (Code: ${e.code})'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-    } on PlatformException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('PlatformException: ${e.message} (Code: ${e.code})'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      _audioPlayer.play();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('An unexpected error occurred: $e'),
+          content: Text('Error occurred during playback: $e'),
           backgroundColor: AppColors.error,
         ),
       );
@@ -94,10 +102,11 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.paused) {
-      // Don't stop. Keep playing in the background.
-    } else if (state == AppLifecycleState.resumed) {
-      _audioPlayer.play(); //Plays again when come back to app
+      _wasPlayingBeforePause = _audioPlayer.playing;
+    } else if (state == AppLifecycleState.resumed && _wasPlayingBeforePause) {
+      _audioPlayer.play();
     }
   }
 
@@ -105,49 +114,70 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _audioPlayer.dispose();
-    widget.onDispose(); // Notify that the player is disposed
+    _animationController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(AppConstants.defaultPadding),
+      padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 10.0),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Display audio title
-          Text(
-            widget.audio.title,
-            style: Theme.of(context).textTheme.titleLarge,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          // Seek Bar
           StreamBuilder<PositionData>(
             stream: _positionDataStream,
             builder: (context, snapshot) {
               final positionData = snapshot.data ??
                   PositionData(Duration.zero, Duration.zero, Duration.zero);
-              return SeekBar(
-                // Use the custom SeekBar
-                duration: positionData.duration,
-                position: positionData.position,
-                bufferedPosition: positionData.bufferedPosition,
-                onChangeEnd: (newPosition) {
-                  _audioPlayer.seek(newPosition);
-                },
+              return Column(
+                children: [
+                  SeekBar(
+                    duration: positionData.duration,
+                    position: positionData.position,
+                    bufferedPosition: positionData.bufferedPosition,
+                    onChangeEnd: (newPosition) {
+                      _audioPlayer.seek(newPosition);
+                    },
+                    barHeight: 8,
+                    thumbRadius: 12,
+                    progressBarColor: Colors.white,
+                    baseBarColor: Colors.white.withOpacity(0.3),
+                    bufferedBarColor: Colors.white.withOpacity(0.5),
+                    thumbColor: Colors.white,
+                    timeLabelTextStyle: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 12), // ✅ Added vertical space
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        _formatDuration(positionData.position),
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                      Text(
+                        "-${_formatDuration(positionData.duration - positionData.position)}",
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ],
               );
             },
           ),
 
-          // Playback Controls
+          const SizedBox(height: 30), // Spacing before controls
+
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               IconButton(
                 icon: const Icon(Icons.replay_10),
-                iconSize: 32,
+                iconSize: 40,
+                color: Colors.white,
                 onPressed: () {
                   _audioPlayer.seek(
                       _audioPlayer.position - const Duration(seconds: 10));
@@ -162,36 +192,34 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
 
                   if (processingState == ProcessingState.loading ||
                       processingState == ProcessingState.buffering) {
-                    return Container(
-                      margin: const EdgeInsets.all(8.0),
-                      width: 64.0,
-                      height: 64.0,
-                      child: const CircularProgressIndicator(),
+                    return const CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     );
                   } else if (playing != true) {
-                    return IconButton(
-                      icon: const Icon(Icons.play_arrow),
-                      iconSize: 64.0,
+                    return FloatingActionButton(
                       onPressed: _audioPlayer.play,
-                    );
-                  } else if (processingState != ProcessingState.completed) {
-                    return IconButton(
-                      icon: const Icon(Icons.pause),
-                      iconSize: 64.0,
-                      onPressed: _audioPlayer.pause,
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.blueAccent,
+                      child: const Icon(Icons.play_arrow, size: 48),
                     );
                   } else {
-                    return IconButton(
-                      icon: const Icon(Icons.replay),
-                      iconSize: 64.0,
-                      onPressed: () => _audioPlayer.seek(Duration.zero),
+                    return FloatingActionButton(
+                      onPressed: _audioPlayer.pause,
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.blueAccent,
+                      child: AnimatedIcon(
+                        icon: AnimatedIcons.play_pause,
+                        progress: _animationController,
+                        size: 48,
+                      ),
                     );
                   }
                 },
               ),
               IconButton(
                 icon: const Icon(Icons.forward_30),
-                iconSize: 32,
+                iconSize: 40,
+                color: Colors.white,
                 onPressed: () {
                   _audioPlayer.seek(
                       _audioPlayer.position + const Duration(seconds: 30));
@@ -199,13 +227,43 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
               ),
             ],
           ),
+
+          const SizedBox(height: 20), // More spacing
+
+          Text(
+            widget.audio.title,
+            style: Theme.of(context)
+                .textTheme
+                .headlineSmall!
+                .copyWith(color: Colors.white),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            widget.audio.artist,
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium!
+                .copyWith(color: Colors.white70),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     );
   }
+
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, "0");
+    String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
+    String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
+    return "$twoDigitMinutes:$twoDigitSeconds";
+  }
 }
 
-// Helper class for progress bar data (no changes needed)
 class PositionData {
   final Duration position;
   final Duration bufferedPosition;

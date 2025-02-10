@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:zenflector/utils/constants.dart';
 
 class AppTheme {
-  // Light Theme
   static ThemeData lightTheme = ThemeData(
-    primarySwatch: createMaterialColor(AppColors.primary),
+    primarySwatch:
+        createMaterialColor(AppColors.primary), // Use custom function
     scaffoldBackgroundColor: AppColors.background,
     fontFamily: 'Montserrat',
     appBarTheme: const AppBarTheme(
@@ -44,9 +44,17 @@ class AppTheme {
         color: AppColors.textSecondary,
       ),
       headlineSmall: TextStyle(
-          // Added headlineSmall for headings
           fontSize: 18,
           fontWeight: FontWeight.bold,
+          color: AppColors.textPrimary),
+      titleLarge: TextStyle(
+          // Add titleLarge and titleMedium
+          fontSize: 22.0,
+          fontWeight: FontWeight.bold,
+          color: AppColors.textPrimary),
+      titleMedium: TextStyle(
+          fontSize: 16.0,
+          fontWeight: FontWeight.w600,
           color: AppColors.textPrimary),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
@@ -61,10 +69,9 @@ class AppTheme {
       ),
     ),
     textButtonTheme: TextButtonThemeData(
-      style: TextButton.styleFrom(
-        foregroundColor: AppColors.buttonPrimary,
-      ),
-    ),
+        style: TextButton.styleFrom(
+      foregroundColor: AppColors.buttonPrimary,
+    )),
     inputDecorationTheme: InputDecorationTheme(
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
@@ -82,16 +89,16 @@ class AppTheme {
       backgroundColor: AppColors.bottomNavBarBackground,
       selectedItemColor: AppColors.bottomNavBarSelected,
       unselectedItemColor: AppColors.bottomNavBarUnselected,
-      type: BottomNavigationBarType.fixed,
+      type: BottomNavigationBarType.fixed, // Important for more than 3 items
     ),
     cardTheme: CardTheme(
       color: AppColors.cardBackground,
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
+    // Add more theme properties as needed
   );
 
-  // Dark Theme
   static ThemeData darkTheme = ThemeData(
     primarySwatch: createMaterialColor(AppColors.primaryDark),
     scaffoldBackgroundColor: AppColors.backgroundDark,
@@ -133,10 +140,21 @@ class AppTheme {
         color: AppColors.textSecondaryDark,
       ),
       headlineSmall: TextStyle(
-          // Added headlineSmall
+          // Added headlineSmall for headings
           fontSize: 18,
           fontWeight: FontWeight.bold,
           color: AppColors.textPrimaryDark),
+      titleLarge: TextStyle(
+        // Add titleLarge and titleMedium
+        fontSize: 22.0,
+        fontWeight: FontWeight.bold,
+        color: AppColors.textPrimaryDark,
+      ),
+      titleMedium: TextStyle(
+        fontSize: 16.0,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textPrimaryDark,
+      ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
@@ -180,7 +198,7 @@ class AppTheme {
     ),
   );
 
-  // Helper function to create a MaterialColor from a single color
+  // Function to create a MaterialColor from a single color (no changes needed)
   static MaterialColor createMaterialColor(Color color) {
     List strengths = <double>[.05];
     Map<int, Color> swatch = {};
