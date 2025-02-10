@@ -1,19 +1,21 @@
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart'
-    as firebase_auth; // Import FirebaseAuth with prefix
-import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 import 'package:zenflector/models/audio.dart';
 import 'package:zenflector/models/genre.dart';
 import 'package:zenflector/models/playlist.dart';
 import 'package:zenflector/models/user.dart';
 
-import '../models/user.dart';
-
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final firebase_auth.FirebaseAuth auth =
-      firebase_auth.FirebaseAuth.instance; // Add FirebaseAuth instance
+  final firebase_auth.FirebaseAuth auth = firebase_auth.FirebaseAuth.instance;
+  final FirebaseStorage _storage =
+      FirebaseStorage.instance; // Add Storage instance
+  final _uuid = Uuid();
 
   // Fetch genres
   Future<List<Genre>> getGenres() async {
@@ -22,6 +24,30 @@ class FirebaseService {
         .map((doc) =>
             Genre.fromFirestore(doc.data() as Map<String, dynamic>, doc.id))
         .toList();
+  }
+
+  // Add a New Genre
+  Future<void> addGenre(String name, String? imageUrl) async {
+    Genre newGenre = Genre(id: _uuid.v4(), name: name, imageUrl: imageUrl);
+    await _firestore
+        .collection('genres')
+        .doc(newGenre.id)
+        .set(newGenre.toFirestore());
+  }
+
+  // Upload Genre Image
+  Future<String?> uploadGenreImage(Uint8List fileBytes, String fileName) async {
+    try {
+      final ref = _storage
+          .ref('audio/genre_images/${_uuid.v4()}_$fileName'); // Unique path
+      final uploadTask = ref.putData(fileBytes); // Use putData for Uint8List
+      final snapshot = await uploadTask.whenComplete(() {});
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      print("Error uploading image: $e");
+      return null; // Or rethrow, depending on how you want to handle errors
+    }
   }
 
   // Fetch audio by genre
@@ -44,7 +70,8 @@ class FirebaseService {
               Audio.fromFirestore(doc.data() as Map<String, dynamic>, doc.id);
           audioList.add(audio);
         } catch (e) {
-          print("Error creating Audio object from Firestore: $e");
+          print(
+              "Error creating Audio object from Firestore: $e"); // PRINT Error if any
         }
       }
       return audioList;
@@ -72,7 +99,61 @@ class FirebaseService {
     return audioList;
   }
 
-  // Get user data
+  // Upload Audio File and Metadata
+  Future<void> uploadAudio(
+    String title,
+    String artist,
+    String genreId,
+    int duration,
+    Uint8List fileBytes,
+    String fileName,
+    String? imageUrl,
+  ) async {
+    try {
+      // 1. Upload the audio file to Firebase Storage
+      final audioRef = _storage.ref(
+          'audio/${_uuid.v4()}_$fileName'); // Storing audio inside genre folder
+      final uploadTask = audioRef.putData(fileBytes);
+      final snapshot = await uploadTask.whenComplete(() {});
+      final fileUrl = await snapshot.ref.getDownloadURL();
+
+      // 2. Create the Audio object
+      Audio newAudio = Audio(
+        id: _uuid.v4(), // Generate unique ID
+        title: title,
+        artist: artist,
+        fileUrl: fileUrl, // URL from Firebase Storage
+        genreId: genreId,
+        duration: duration,
+        imageUrl: imageUrl,
+        isPremium: false, // Or get this from the form
+      );
+
+      // 3. Add the Audio document to Firestore
+      await _firestore
+          .collection('audio')
+          .doc(newAudio.id)
+          .set(newAudio.toFirestore());
+    } catch (e) {
+      print("Error uploading audio: $e");
+      rethrow; // Re-throw to handle in the UI
+    }
+  }
+
+  Future<String?> uploadAudioFile(
+      Uint8List fileBytes, String fileName, String genreId) async {
+    try {
+      final audioRef = _storage.ref('audio/$genreId/${_uuid.v4()}_$fileName');
+      final uploadTask = audioRef.putData(fileBytes);
+      final snapshot = await uploadTask.whenComplete(() {});
+      return await snapshot.ref.getDownloadURL();
+    } catch (e) {
+      print("Error uploading audio file: $e");
+      return null;
+    }
+  }
+
+  // Get user data (Modified to include photoURL)
   Future<User?> getUser(String uid) async {
     DocumentSnapshot snapshot =
         await _firestore.collection('users').doc(uid).get();
@@ -84,15 +165,48 @@ class FirebaseService {
     }
   }
 
-  // Create new user
-  Future<void> createUser(String uid, String email, String? name) async {
+  // Create new user (Modified to include photoURL)
+  Future<void> createUser(String uid, String email, String? name,
+      {String? photoURL}) async {
+    // Add optional photoURL
     User newUser = User(
       uid: uid,
       email: email,
       name: name,
       favorites: [],
+      photoURL: photoURL, // Add to the User object
     );
     await _firestore.collection('users').doc(uid).set(newUser.toFirestore());
+  }
+
+  // Update user data (New method!)
+  Future<void> updateUser(User user) async {
+    try {
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .update(user.toFirestore());
+      print("Firestore: User data updated successfully.");
+    } catch (e) {
+      print("Error updating user: $e");
+      rethrow; // Re-throw the error so calling functions can handle it
+    }
+  }
+
+  // Upload User Profile Image (New method!)
+  Future<String?> uploadProfileImage(
+      String userId, Uint8List fileBytes, String fileName) async {
+    try {
+      final ref = _storage
+          .ref('user_profiles/$userId/${_uuid.v4()}_$fileName'); // Unique path
+      final uploadTask = ref.putData(fileBytes); // Use putData for Uint8List
+      final snapshot = await uploadTask.whenComplete(() {});
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      print("Error uploading profile image: $e");
+      return null; // Or rethrow, depending on how you want to handle errors
+    }
   }
 
   // Get favorite audio IDs for a user
@@ -181,6 +295,7 @@ class FirebaseService {
       userId: userId,
       audioIds: [],
     );
+
     try {
       // Add the playlist and get the document reference to update the ID
       DocumentReference docRef = await _firestore
@@ -232,102 +347,4 @@ class FirebaseService {
   Future<void> deletePlaylist(String playlistId) async {
     await _firestore.collection('playlists').doc(playlistId).delete();
   }
-}
-
-// Corrected _DummyContext implementation
-class _DummyContext extends BuildContext {
-  @override
-  bool get debugDoingBuild => false;
-
-  @override
-  InheritedWidget dependOnInheritedElement(InheritedElement ancestor,
-      {Object? aspect}) {
-    throw UnimplementedError();
-  }
-
-  @override
-  T? dependOnInheritedWidgetOfExactType<T extends InheritedWidget>(
-      {Object? aspect}) {
-    return null;
-  }
-
-  @override
-  DiagnosticsNode describeElement(String name,
-      {DiagnosticsTreeStyle style = DiagnosticsTreeStyle.errorProperty}) {
-    throw UnimplementedError();
-  }
-
-  @override
-  List<DiagnosticsNode> describeMissingAncestor(
-      {required Type expectedAncestorType}) {
-    throw UnimplementedError();
-  }
-
-  @override
-  DiagnosticsNode describeOwnershipChain(String name) {
-    throw UnimplementedError();
-  }
-
-  @override
-  DiagnosticsNode describeWidget(String name,
-      {DiagnosticsTreeStyle style = DiagnosticsTreeStyle.errorProperty}) {
-    throw UnimplementedError();
-  }
-
-  @override
-  T? findAncestorRenderObjectOfType<T extends RenderObject>() {
-    return null;
-  }
-
-  @override
-  T? findAncestorStateOfType<T extends State>() {
-    return null;
-  }
-
-  @override
-  T? findAncestorWidgetOfExactType<T extends Widget>() {
-    return null;
-  }
-
-  @override
-  RenderObject? findRenderObject() {
-    return null;
-  }
-
-  @override
-  T? findRootAncestorStateOfType<T extends State>() {
-    return null;
-  }
-
-  @override
-  InheritedElement?
-      getElementForInheritedWidgetOfExactType<T extends InheritedWidget>() {
-    return null;
-  }
-
-  @override
-  BuildOwner? get owner => null;
-
-  @override
-  T? getInheritedWidgetOfExactType<T extends InheritedWidget>() {
-    return null;
-  }
-
-  @override
-  bool get mounted => false;
-
-  @override
-  void visitAncestorElements(bool Function(Element element) visitor) {}
-
-  @override
-  void visitChildElements(ElementVisitor visitor) {}
-
-  @override
-  Widget get widget => throw UnimplementedError();
-
-  @override
-  void dispatchNotification(Notification notification) {}
-
-  @override
-  Size? get size => null;
 }

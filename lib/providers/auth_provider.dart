@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/material.dart';
 import 'package:zenflector/api/firebase_service.dart';
@@ -45,17 +47,52 @@ class AuthProvider with ChangeNotifier {
       // Data loading now happens in the authStateChanges listener
     } catch (e) {
       print("Error during sign in: $e");
-      rethrow;
+      rethrow; // Re-throw the exception so the UI can handle it
     }
   }
 
+  // Modified signUpWithEmailAndPassword
   Future<void> signUpWithEmailAndPassword(
-      String email, String password, String name) async {
+    String email,
+    String password,
+    String name,
+    Uint8List? imageBytes, // Add imageBytes parameter
+    String? imageName, //Add image name
+  ) async {
     try {
       final userCredential = await _auth.createUserWithEmailAndPassword(
-          email: email, password: password);
-      await _firebaseService.createUser(userCredential.user!.uid, email, name);
-      // Data loading now happens in the authStateChanges listener
+        email: email,
+        password: password,
+      );
+      final user = userCredential.user;
+      if (user != null) {
+        String? photoURL;
+
+        // Upload image if provided
+        if (imageBytes != null) {
+          photoURL = await _firebaseService.uploadProfileImage(
+              user.uid, imageBytes, imageName!); // Upload and get URL
+        }
+
+        // Create user document in Firestore, including the photoURL
+        await _firebaseService.createUser(
+          user.uid,
+          email,
+          name,
+          photoURL: photoURL, // Pass photoURL to createUser
+        );
+
+        // Update local user object (if needed, for immediate display)
+        _currentUser = _currentUser?.copyWith(name: name, photoURL: photoURL) ??
+            User(
+              uid: user.uid,
+              email: email,
+              name: name,
+              favorites: [],
+              photoURL: photoURL, // Include in the local User object
+            );
+        notifyListeners(); // Notify after updating local user data
+      }
     } catch (e) {
       print("Error during sign up: $e");
       rethrow;
@@ -64,6 +101,5 @@ class AuthProvider with ChangeNotifier {
 
   Future<void> signOut() async {
     await _auth.signOut();
-    // Data clearing now happens in the authStateChanges listener
   }
 }

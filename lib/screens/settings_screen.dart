@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
-import 'package:zenflector/providers/app_settings_provider.dart'; // Import provider
+import 'package:url_launcher/url_launcher.dart'; // Import url_launcher
+import 'package:zenflector/providers/app_settings_provider.dart';
 import 'package:zenflector/providers/auth_provider.dart';
 import 'package:zenflector/utils/constants.dart';
 
@@ -12,49 +14,70 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
-  bool _isScanning = false;
-  List<ScanResult> _scanResults = [];
+class _SettingsScreenState extends State<SettingsScreen>
+    with WidgetsBindingObserver {
+  BluetoothDevice? _connectedDevice;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this); // Add observer
+    _loadConnectedDevice(); // Load on startup
+  }
 
   @override
   void dispose() {
-    FlutterBluePlus.stopScan(); // Stop scanning when the screen is disposed
+    WidgetsBinding.instance.removeObserver(this); // Remove observer. ESSENTIAL.
     super.dispose();
   }
 
-  // Function to start/stop Bluetooth scanning
-  Future<void> _toggleBluetoothScan() async {
-    if (_isScanning) {
-      FlutterBluePlus.stopScan();
-    } else {
-      setState(() {
-        _isScanning = true;
-        _scanResults = []; // Clear previous results
-      });
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // When the app returns to the foreground, refresh.
+      _loadConnectedDevice();
+    }
+  }
 
-      try {
-        // Start scanning with a timeout
-        await FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
+  Future<void> _loadConnectedDevice() async {
+    // Check if Bluetooth is available and on *before* trying to get connected devices.
+    bool isAvailable = await FlutterBluePlus.isAvailable;
+    bool isOn = await FlutterBluePlus.isOn;
 
-        // Listen to scan results (if you need to update the UI while scanning)
-        FlutterBluePlus.scanResults.listen((results) {
-          setState(() {
-            _scanResults = results;
-          });
-        }, onDone: () {
-          setState(() {
-            _isScanning = false;
-          });
+    if (!isAvailable || !isOn) {
+      if (mounted) {
+        setState(() {
+          _connectedDevice =
+              null; // Clear device if Bluetooth is off/unavailable
         });
-      } catch (e) {
-        //Handle errors (e.g., Bluetooth is turned off)
+      }
+      return; // Exit early if Bluetooth is not ready
+    }
+
+    try {
+      List<BluetoothDevice> devices =
+          await FlutterBluePlus.connectedSystemDevices;
+      if (devices.isNotEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text('Bluetooth error: $e'),
-                backgroundColor: AppColors.error),
-          );
+          setState(() {
+            _connectedDevice = devices.first; // Simplification: take the first.
+          });
         }
+      } else {
+        if (mounted) {
+          setState(() {
+            _connectedDevice = null; // Explicitly set to null if no devices
+          });
+        }
+      }
+    } catch (e) {
+      print("Error getting connected devices: $e"); // Log the error
+      if (mounted) {
+        setState(() {
+          _connectedDevice =
+              null; // Set to null on error to update the UI correctly.
+        });
       }
     }
   }
@@ -71,66 +94,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(AppConstants.defaultPadding),
         children: [
-          // User Account
+          // User Account Section
           ListTile(
             leading: const Icon(Icons.account_circle),
             title: const Text('Account'),
             subtitle: Text(authProvider.currentUser?.email ?? 'Not logged in'),
             onTap: () {
-              // TODO: Navigate to account details screen
+              // TODO: Navigate to an account details/edit screen
             },
           ),
           const Divider(),
 
-          // Bluetooth Connection
+          // Bluetooth Connection Section
           ListTile(
             leading: const Icon(Icons.bluetooth),
             title: const Text('Bluetooth Headband'),
-            subtitle: Text(_isScanning ? 'Scanning...' : 'Tap to scan'),
-            trailing: _isScanning
-                ? const CircularProgressIndicator()
-                : const Icon(Icons.arrow_forward_ios),
-            onTap: _toggleBluetoothScan,
+            subtitle: Text(_connectedDevice != null
+                ? 'Connected: ${_connectedDevice!.platformName.isNotEmpty ? _connectedDevice!.platformName : "Unknown Device"}'
+                : 'No device connected'),
           ),
-
-          // Display scanned devices (if any)
-          if (_scanResults.isNotEmpty) ...[
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8.0),
-              child: Text(
-                'Found Devices:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-            ..._scanResults.map((result) => ListTile(
-                  title: Text(result.device.localName.isNotEmpty
-                      ? result.device.localName
-                      : 'Unknown Device'),
-                  subtitle: Text(result.device.remoteId.toString()),
-                  onTap: () async {
-                    // Connect to the device
-                    try {
-                      await result.device.connect();
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Connected to device!'),
-                              backgroundColor: Colors.green),
-                        );
-                      }
-                      // TODO: Navigate to a device control screen or handle connection
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                              content: Text('Connection failed: $e'),
-                              backgroundColor: AppColors.error),
-                        );
-                      }
-                    }
-                  },
-                )),
-          ],
           const Divider(),
 
           // App Preferences
@@ -138,7 +120,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: const Text('Dark Mode'),
             value: appSettingsProvider.isDarkMode,
             onChanged: (value) {
-              appSettingsProvider.setDarkMode(value); // Update dark mode
+              appSettingsProvider.setDarkMode(value);
             },
             secondary: const Icon(Icons.dark_mode),
           ),
@@ -147,7 +129,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: const Text('Notifications'),
             subtitle: const Text('Manage notification settings'),
             onTap: () {
-              // TODO: Navigate to notification settings
+              // TODO: Implement notification settings
             },
           ),
           const Divider(),
@@ -157,21 +139,86 @@ class _SettingsScreenState extends State<SettingsScreen> {
             leading: const Icon(Icons.logout),
             title: const Text('Sign Out'),
             onTap: () async {
-              await authProvider.signOut(); // Sign out
+              await authProvider.signOut();
             },
           ),
           const Divider(),
 
           // About and Help
           ListTile(
-            leading: const Icon(Icons.info),
-            title: const Text("About"),
+            leading: const Icon(Icons.info_outline),
+            title: const Text('About'),
             onTap: () {
-              //TODO: Implement about section.
+              _showAboutDialog(context); // Use the helper function
             },
-          )
+          ),
         ],
       ),
     );
+  }
+
+// Helper function for the About dialog.  This avoids FutureBuilder issues.
+  void _showAboutDialog(BuildContext context) {
+    PackageInfo.fromPlatform().then((packageInfo) {
+      // Use package_info_plus
+      String appName = packageInfo.appName;
+      String version = packageInfo.version;
+      String buildNumber = packageInfo.buildNumber;
+
+      showAboutDialog(
+        context: context,
+        applicationIcon: Image.asset(
+          'assets/appstore.png', //  Replace with your app icon path
+          width: 64,
+          height: 64,
+          errorBuilder: (context, error, stackTrace) => const Icon(Icons.error),
+        ),
+        applicationName: appName, // Use dynamic name
+        applicationVersion: "$version ($buildNumber)", // Use dynamic version
+        applicationLegalese: '© 2024 Zenflector', //  Your copyright
+        children: <Widget>[
+          const SizedBox(height: 24),
+          const Text(
+            "ZenFlector is designed to help you improve your sleep quality, "
+            "reduce stress, and enhance your overall well-being through a curated "
+            "collection of soothing sounds, guided meditations, and hypnotic stories.  "
+            "Whether you're struggling with insomnia, seeking relaxation, or aiming to "
+            "achieve a more positive mindset, ZenFlector provides the tools you need "
+            "to achieve your goals.",
+          ),
+          const SizedBox(height: 16),
+          TextButton(
+            onPressed: () async {
+              final url =
+                  Uri.parse('https://your-privacy-policy.com'); // Replace
+              if (!await launchUrl(url)) {
+                // Use await here
+                if (context.mounted) {
+                  //Check if context is mounted
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Could not launch URL')),
+                  );
+                }
+              }
+            },
+            child: const Text('Privacy Policy'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final url = Uri.parse('https://your-termsofservice.com');
+              if (!await launchUrl(url)) {
+                if (context.mounted) {
+                  //Check if context is mounted
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Could not launch URL')),
+                  );
+                }
+              }
+            },
+            child: const Text('Terms of Service'),
+          ),
+        ],
+      );
+    });
   }
 }

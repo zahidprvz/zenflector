@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart'; // Import image_picker
 import 'package:provider/provider.dart';
 import 'package:zenflector/providers/auth_provider.dart';
 import 'package:zenflector/utils/constants.dart';
@@ -21,6 +24,9 @@ class _AuthScreenState extends State<AuthScreen> {
   AuthMode _authMode = AuthMode.Login; // Use the enum
   bool _isLoading = false;
 
+  Uint8List? _imageBytes; // Store image bytes
+  String? _imageName; // Store image name
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -34,6 +40,19 @@ class _AuthScreenState extends State<AuthScreen> {
       _authMode =
           _authMode == AuthMode.Login ? AuthMode.SignUp : AuthMode.Login;
     });
+  }
+
+  Future<void> _pickImage() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+
+    if (image != null) {
+      final bytes = await image.readAsBytes(); // Read as bytes
+      setState(() {
+        _imageBytes = bytes; // Store the bytes
+        _imageName = image.name;
+      });
+    }
   }
 
   void _submitForm(AuthProvider authProvider) async {
@@ -50,10 +69,26 @@ class _AuthScreenState extends State<AuthScreen> {
         await authProvider.signInWithEmailAndPassword(
             _emailController.text, _passwordController.text);
       } else {
+        // Sign Up *with image*
+        if (_imageBytes == null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                  content: Text('Please select an image'),
+                  backgroundColor: AppColors.error),
+            );
+            setState(() {
+              _isLoading = false;
+            });
+          }
+          return;
+        }
         await authProvider.signUpWithEmailAndPassword(
           _emailController.text,
           _passwordController.text,
           _nameController.text,
+          _imageBytes, // Pass image bytes
+          _imageName!,
         );
       }
       // No navigation here; main.dart handles it based on AuthProvider state
@@ -68,7 +103,7 @@ class _AuthScreenState extends State<AuthScreen> {
     } finally {
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          _isLoading = false; // Ensure loading indicator is hidden
         });
       }
     }
@@ -88,10 +123,29 @@ class _AuthScreenState extends State<AuthScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  _authMode == AuthMode.Login ? 'Welcome!' : 'Join us Today',
+                  _authMode == AuthMode.Login ? 'Welcome!' : "Join us Today",
                   style: Theme.of(context).textTheme.displayLarge,
                 ),
                 const SizedBox(height: 20),
+
+                // Image Picker (only in sign-up mode)
+                if (_authMode == AuthMode.SignUp) ...[
+                  GestureDetector(
+                    onTap: _pickImage, // Call the image picker
+                    child: CircleAvatar(
+                      radius: 50,
+                      backgroundColor: Colors.grey[300],
+                      backgroundImage: _imageBytes != null
+                          ? MemoryImage(_imageBytes!)
+                          : null, // Use MemoryImage
+                      child: _imageBytes == null
+                          ? const Icon(Icons.camera_alt, size: 50)
+                          : null, // Show icon if no image
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
                 if (_authMode == AuthMode.SignUp) // Name field for sign-up
                   TextFormField(
                     controller: _nameController,

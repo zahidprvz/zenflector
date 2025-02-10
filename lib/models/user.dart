@@ -1,11 +1,12 @@
 import 'package:equatable/equatable.dart';
 
 class User extends Equatable {
-  final String uid; // User ID from Firebase Authentication
+  final String uid;
   final String email;
-  final String? name; // Optional name
-  final List<String> favorites; // List of favorite audio IDs
-  final Map<String, dynamic>? preferences; // User preferences (optional)
+  final String? name;
+  final List<String> favorites;
+  final Map<String, dynamic>? preferences;
+  final String? photoURL; // Add photoURL
 
   const User({
     required this.uid,
@@ -13,6 +14,7 @@ class User extends Equatable {
     this.name,
     required this.favorites,
     this.preferences,
+    this.photoURL, // Add to constructor
   });
 
   factory User.fromFirestore(Map<String, dynamic> data, String uid) {
@@ -22,6 +24,7 @@ class User extends Equatable {
       name: data['name'],
       favorites: List<String>.from(data['favorites'] ?? []),
       preferences: data['preferences'],
+      photoURL: data['photoURL'], // Add fromFirestore
     );
   }
 
@@ -31,9 +34,29 @@ class User extends Equatable {
       'name': name,
       'favorites': favorites,
       'preferences': preferences,
+      'photoURL': photoURL, // Add toFirestore
     };
   }
 
+  User copyWith({
+    String? uid,
+    String? email,
+    String? name,
+    List<String>? favorites,
+    Map<String, dynamic>? preferences,
+    String? photoURL,
+  }) {
+    return User(
+      uid: uid ?? this.uid,
+      email: email ?? this.email,
+      name: name ?? this.name,
+      favorites: favorites ?? this.favorites,
+      preferences: preferences ?? this.preferences,
+      photoURL: photoURL ?? this.photoURL,
+    );
+  }
+
   @override
-  List<Object?> get props => [uid, email, name, favorites, preferences];
+  List<Object?> get props =>
+      [uid, email, name, favorites, preferences, photoURL];
 }

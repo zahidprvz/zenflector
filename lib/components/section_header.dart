@@ -28,7 +28,7 @@ class SectionHeader extends StatelessWidget {
             TextButton(
               onPressed: onViewAll,
               child: Text(
-                'Voir tout', // Or "View All" in English
+                'View All', // Or "View All" in English
                 style: TextStyle(color: AppColors.secondary),
               ),
             ),
