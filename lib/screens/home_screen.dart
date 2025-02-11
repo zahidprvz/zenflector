@@ -53,7 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('ZenFlector'),
-        centerTitle: true,
+        // centerTitle: true,
         actions: [
           // Search Icon
           IconButton(
