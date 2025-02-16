@@ -118,7 +118,7 @@ class SeekBarState extends State<SeekBar> {
         // Time Labels (Positioned)
         Positioned(
           right: 16.0,
-          bottom: 0.0,
+          bottom: -4.0,
           child: Text(
               RegExp(r'((^0*[1-9]\d*:)?\d{2}:\d{2})\.\d+$')
                       .firstMatch("$_remaining")
@@ -128,7 +128,7 @@ class SeekBarState extends State<SeekBar> {
         ),
         Positioned(
           left: 16.0,
-          bottom: 0.0,
+          bottom: -4.0,
           child: Text(
             _formatDuration(widget.position), // Current position
             style: textStyle,

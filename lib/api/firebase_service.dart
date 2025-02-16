@@ -99,7 +99,7 @@ class FirebaseService {
     return audioList;
   }
 
-  // Upload Audio File and Metadata
+  // Upload Audio File and Metadata (UPDATED)
   Future<void> uploadAudio(
     String title,
     String artist,
@@ -108,25 +108,26 @@ class FirebaseService {
     Uint8List fileBytes,
     String fileName,
     String? imageUrl,
+    String? description, // Add description parameter
   ) async {
     try {
       // 1. Upload the audio file to Firebase Storage
-      final audioRef = _storage.ref(
-          'audio/${_uuid.v4()}_$fileName'); // Storing audio inside genre folder
+      final audioRef = _storage.ref('audio/${_uuid.v4()}_$fileName');
       final uploadTask = audioRef.putData(fileBytes);
       final snapshot = await uploadTask.whenComplete(() {});
       final fileUrl = await snapshot.ref.getDownloadURL();
 
       // 2. Create the Audio object
       Audio newAudio = Audio(
-        id: _uuid.v4(), // Generate unique ID
+        id: _uuid.v4(),
         title: title,
         artist: artist,
-        fileUrl: fileUrl, // URL from Firebase Storage
+        fileUrl: fileUrl,
         genreId: genreId,
         duration: duration,
         imageUrl: imageUrl,
-        isPremium: false, // Or get this from the form
+        isPremium: false,
+        description: description, // Set the description
       );
 
       // 3. Add the Audio document to Firestore
@@ -136,7 +137,7 @@ class FirebaseService {
           .set(newAudio.toFirestore());
     } catch (e) {
       print("Error uploading audio: $e");
-      rethrow; // Re-throw to handle in the UI
+      rethrow;
     }
   }
 

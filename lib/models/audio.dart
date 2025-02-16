@@ -9,6 +9,7 @@ class Audio extends Equatable {
   final int duration;
   final String? imageUrl;
   final bool? isPremium;
+  final String? description; // New description field
 
   const Audio({
     required this.id,
@@ -19,10 +20,10 @@ class Audio extends Equatable {
     required this.duration,
     this.imageUrl,
     this.isPremium,
+    this.description, // Initialize description
   });
 
   factory Audio.fromFirestore(Map<String, dynamic> data, String id) {
-    // Handle isPremium correctly, allowing for String, bool, or null
     dynamic premium = data['isPremium'];
     bool? isPremiumValue;
 
@@ -36,13 +37,14 @@ class Audio extends Equatable {
 
     return Audio(
       id: id,
-      title: data['title'] ?? 'Unknown Title', // Fallback for null title
-      artist: data['artist'] ?? 'Unknown Artist', // Fallback for null artist
-      fileUrl: data['fileUrl'] ?? '', // Fallback for null fileUrl
-      genreId: data['genreId'] ?? '', // Fallback for null genreId
-      duration: (data['duration'] ?? 0).toInt(), // Fallback for null duration
-      imageUrl: data['imageUrl'], // Nullable field
-      isPremium: isPremiumValue, // Use the converted value
+      title: data['title'] ?? 'Unknown Title',
+      artist: data['artist'] ?? 'Unknown Artist',
+      fileUrl: data['fileUrl'] ?? '',
+      genreId: data['genreId'] ?? '',
+      duration: (data['duration'] ?? 0).toInt(),
+      imageUrl: data['imageUrl'],
+      isPremium: isPremiumValue,
+      description: data['description'], // Get description from Firestore
     );
   }
 
@@ -54,11 +56,21 @@ class Audio extends Equatable {
       'genreId': genreId,
       'duration': duration,
       'imageUrl': imageUrl,
-      'isPremium': isPremium, // Store as boolean
+      'isPremium': isPremium,
+      'description': description, // Add description to Firestore data
     };
   }
 
   @override
-  List<Object?> get props =>
-      [id, title, artist, fileUrl, genreId, duration, imageUrl, isPremium];
+  List<Object?> get props => [
+        id,
+        title,
+        artist,
+        fileUrl,
+        genreId,
+        duration,
+        imageUrl,
+        isPremium,
+        description, // Include description in props
+      ];
 }

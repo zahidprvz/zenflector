@@ -21,6 +21,9 @@ class AudioCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final iconColor = isDarkMode ? Colors.white : AppColors.textSecondary;
+
     return GestureDetector(
       onTap: onTap,
       child: Card(
@@ -67,8 +70,11 @@ class AudioCard extends StatelessWidget {
                       IconButton(
                         icon: Icon(
                           isFavorite ? Icons.favorite : Icons.favorite_border,
-                          color:
-                              isFavorite ? Colors.red : AppColors.textSecondary,
+                          color: isFavorite
+                              ? Colors.red
+                              : Theme.of(context)
+                                  .iconTheme
+                                  .color, // Uses theme's icon color
                         ),
                         onPressed: onFavoritePressed,
                         constraints: const BoxConstraints(),
@@ -79,7 +85,10 @@ class AudioCard extends StatelessWidget {
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
                             onPressed: onRemovePressed,
-                            icon: const Icon(Icons.remove_circle_outline))
+                            icon: Icon(
+                              Icons.remove_circle_outline,
+                              color: iconColor,
+                            ))
                     ],
                   ),
                   Text(
@@ -88,6 +97,16 @@ class AudioCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (audio.description != null &&
+                      audio.description!.isNotEmpty) // Check for null or empty
+                    Text(
+                      audio.description!.length > 50 // Limit to 50 characters
+                          ? '${audio.description!.substring(0, 50)}...'
+                          : audio.description!,
+                      style: Theme.of(context).textTheme.bodySmall,
+                      maxLines: 2, // Limit to two lines
+                      overflow: TextOverflow.ellipsis, // Handle overflow
+                    ),
                   Text(
                     '${audio.duration ~/ 60}m',
                     style: Theme.of(context).textTheme.bodySmall,

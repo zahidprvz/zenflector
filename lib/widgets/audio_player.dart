@@ -1,6 +1,5 @@
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:rxdart/rxdart.dart';
@@ -19,40 +18,17 @@ class AudioPlayerWidget extends StatefulWidget {
 
 class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
-  late final AudioPlayer _audioPlayer = AudioPlayer();
+  late final AudioPlayer _audioPlayer;
   late AnimationController _animationController;
   late Animation<double> _playPauseAnimation;
   bool _wasPlayingBeforePause = false;
-
-  // ✅ Custom clampDuration method
-  Duration clampDuration(Duration value, Duration min, Duration max) {
-    if (value < min) return min;
-    if (value > max) return max;
-    return value;
-  }
-
-  // ✅ Updated Position Data Stream
-  Stream<PositionData> get _positionDataStream =>
-      Rx.combineLatest3<Duration, Duration, Duration?, PositionData>(
-        _audioPlayer.positionStream,
-        _audioPlayer.bufferedPositionStream,
-        _audioPlayer.durationStream,
-        (position, bufferedPosition, duration) {
-          duration ??= Duration.zero;
-
-          // Clamping position and buffered position
-          position = clampDuration(position, Duration.zero, duration);
-          bufferedPosition =
-              clampDuration(bufferedPosition, Duration.zero, duration);
-
-          return PositionData(position, bufferedPosition, duration);
-        },
-      );
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    _audioPlayer = AudioPlayer();
     _initAudioPlayer();
 
     _animationController = AnimationController(
@@ -91,14 +67,41 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
       ));
       _audioPlayer.play();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error occurred during playback: $e'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error during playback: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
+
+  // ✅ Custom clampDuration method
+  Duration clampDuration(Duration value, Duration min, Duration max) {
+    if (value < min) return min;
+    if (value > max) return max;
+    return value;
+  }
+
+  // ✅ Updated Position Data Stream
+  Stream<PositionData> get _positionDataStream =>
+      Rx.combineLatest3<Duration, Duration, Duration?, PositionData>(
+        _audioPlayer.positionStream,
+        _audioPlayer.bufferedPositionStream,
+        _audioPlayer.durationStream,
+        (position, bufferedPosition, duration) {
+          duration ??= Duration.zero;
+
+          // Clamping position and buffered position
+          position = clampDuration(position, Duration.zero, duration);
+          bufferedPosition =
+              clampDuration(bufferedPosition, Duration.zero, duration);
+
+          return PositionData(position, bufferedPosition, duration);
+        },
+      );
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -150,7 +153,7 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
                       color: Colors.white,
                     ),
                   ),
-                  const SizedBox(height: 12), // ✅ Added vertical space
+                  const SizedBox(height: 20), // Increased from 12 to 20
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -168,9 +171,7 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
               );
             },
           ),
-
-          const SizedBox(height: 30), // Spacing before controls
-
+          const SizedBox(height: 30),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
@@ -227,9 +228,7 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
               ),
             ],
           ),
-
-          const SizedBox(height: 20), // More spacing
-
+          const SizedBox(height: 20),
           Text(
             widget.audio.title,
             style: Theme.of(context)

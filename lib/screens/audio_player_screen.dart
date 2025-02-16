@@ -27,9 +27,8 @@ class AudioPlayerScreen extends StatelessWidget {
         title: Text(currentAudio.title),
       ),
       body: Column(
-        // Use a Column to arrange image and player
         children: [
-          // Display Image (if available)
+          // Display Image
           if (currentAudio.imageUrl != null &&
               currentAudio.imageUrl!.isNotEmpty)
             Padding(
@@ -39,19 +38,15 @@ class AudioPlayerScreen extends StatelessWidget {
                 child: CachedNetworkImage(
                   imageUrl: currentAudio.imageUrl!,
                   placeholder: (context, url) => Container(
-                      height: 300, // Set a fixed height while loading/error
-                      width: 300,
-                      color: AppColors.highlightColor), // Placeholder color
-                  errorWidget: (context, url, error) =>
-                      const Icon(Icons.error), // Show error icon
-
-                  fit: BoxFit.cover, // Cover the available space
-                  height: 300, //  fixed height
-                  width: 300, //  fixed width
+                      height: 300, width: 300, color: AppColors.highlightColor),
+                  errorWidget: (context, url, error) => const Icon(Icons.error),
+                  fit: BoxFit.cover,
+                  height: 300,
+                  width: 300,
                 ),
               ),
             )
-          else // Show a placeholder if no image
+          else
             Container(
               height: 300,
               width: double.infinity,
@@ -60,11 +55,51 @@ class AudioPlayerScreen extends StatelessWidget {
                   const Icon(Icons.music_note, size: 50, color: Colors.white),
             ),
 
-          // Audio Player Widget
-          Expanded(
-            // Allow the player to take remaining space
-            child: AudioPlayerWidget(audio: currentAudio),
-          ),
+          // // **Title**
+          // Padding(
+          //   padding:
+          //       const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          //   child: Text(
+          //     currentAudio.title,
+          //     style: Theme.of(context).textTheme.headlineSmall,
+          //     textAlign: TextAlign.center,
+          //   ),
+          // ),
+
+          // // **Artist Name**
+          // if (currentAudio.artist != null &&
+          //     currentAudio.artist!.isNotEmpty) // Show artist only if available
+          //   Padding(
+          //     padding:
+          //         const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+          //     child: Text(
+          //       currentAudio.artist!,
+          //       style: Theme.of(context)
+          //           .textTheme
+          //           .bodyMedium
+          //           ?.copyWith(color: Colors.grey.shade600),
+          //       textAlign: TextAlign.center,
+          //     ),
+          //   ),
+
+          // **Scrollable Description Section**
+          if (currentAudio.description != null &&
+              currentAudio.description!.isNotEmpty)
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: SingleChildScrollView(
+                  child: Text(
+                    currentAudio.description!,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
+
+          // **Audio Player Widget**
+          AudioPlayerWidget(audio: currentAudio),
         ],
       ),
     );
