@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:zenflector/providers/app_settings_provider.dart';
 import 'package:zenflector/providers/auth_provider.dart';
 import 'package:zenflector/screens/profile_screen.dart';
@@ -62,7 +65,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         });
       }
     } catch (e) {
-      print("Error getting connected devices: $e");
+      debugPrint("Error getting connected devices: $e");
       if (mounted) {
         setState(() {
           _connectedDevice = null;
@@ -75,12 +78,17 @@ class _SettingsScreenState extends State<SettingsScreen>
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final appSettingsProvider = Provider.of<AppSettingsProvider>(context);
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final isDarkMode = appSettingsProvider.isDarkMode;
 
     final headingTextStyle = TextStyle(
       color: isDarkMode ? Colors.white : Colors.black,
       fontWeight: FontWeight.bold,
       fontSize: 16,
+    );
+
+    final subheadingTextStyle = TextStyle(
+      color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
+      fontSize: 14,
     );
 
     return Scaffold(
@@ -93,7 +101,10 @@ class _SettingsScreenState extends State<SettingsScreen>
           ListTile(
             leading: const Icon(Icons.account_circle),
             title: Text('Account', style: headingTextStyle),
-            subtitle: Text(authProvider.currentUser?.email ?? 'Not logged in'),
+            subtitle: Text(
+              authProvider.currentUser?.email ?? 'Not logged in',
+              style: subheadingTextStyle,
+            ),
             onTap: () {
               Navigator.push(
                 context,
@@ -105,9 +116,12 @@ class _SettingsScreenState extends State<SettingsScreen>
           ListTile(
             leading: const Icon(Icons.bluetooth),
             title: Text('Bluetooth Headband', style: headingTextStyle),
-            subtitle: Text(_connectedDevice != null
-                ? 'Connected: ${_connectedDevice!.platformName.isNotEmpty ? _connectedDevice!.platformName : "Unknown Device"}'
-                : 'No device connected'),
+            subtitle: Text(
+              _connectedDevice != null
+                  ? 'Connected: ${_connectedDevice!.platformName.isNotEmpty ? _connectedDevice!.platformName : "Unknown Device"}'
+                  : 'No device connected',
+              style: subheadingTextStyle,
+            ),
           ),
           const Divider(),
           SwitchListTile(
@@ -121,7 +135,8 @@ class _SettingsScreenState extends State<SettingsScreen>
           ListTile(
             leading: const Icon(Icons.notifications),
             title: Text('Notifications', style: headingTextStyle),
-            subtitle: const Text('Manage notification settings'),
+            subtitle: Text('Manage notification settings',
+                style: subheadingTextStyle),
             onTap: () {
               // TODO: Implement notification settings
             },
@@ -167,51 +182,65 @@ class _SettingsScreenState extends State<SettingsScreen>
         children: <Widget>[
           const SizedBox(height: 24),
           Text(
-            "ZenFlector is designed to help you improve your sleep quality, "
-            "reduce stress, and enhance your overall well-being through a curated "
-            "collection of soothing sounds, guided meditations, and hypnotic stories.",
+            "ZenFlector is designed to help you improve your sleep quality, reduce stress, and enhance your overall well-being through a curated collection of soothing sounds, guided meditations, and hypnotic stories.",
             style: TextStyle(
-              color: isDarkMode ? Colors.white70 : Colors.black87,
+              color: isDarkMode ? Colors.black : Colors.black87,
               fontSize: 14,
             ),
           ),
           const SizedBox(height: 16),
           TextButton(
             onPressed: () async {
-              final url = Uri.parse('https://your-privacy-policy.com');
-              if (!await launchUrl(url)) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Could not launch URL')),
-                  );
-                }
-              }
+              await _downloadPrivacyPolicy();
             },
-            child: Text(
-              'Privacy Policy',
-              style: TextStyle(
-                  color: isDarkMode ? Colors.lightBlueAccent : Colors.blue),
-            ),
-          ),
-          TextButton(
-            onPressed: () async {
-              final url = Uri.parse('https://your-termsofservice.com');
-              if (!await launchUrl(url)) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Could not launch URL')),
-                  );
-                }
-              }
-            },
-            child: Text(
-              'Terms of Service',
-              style: TextStyle(
-                  color: isDarkMode ? Colors.lightBlueAccent : Colors.blue),
-            ),
+            child: const Text('Download Privacy Policy',
+                style: TextStyle(color: Colors.blue)),
           ),
         ],
       );
     });
+  }
+
+  Future<void> _downloadPrivacyPolicy() async {
+    try {
+      final byteData = await rootBundle
+          .load('assets/privacy_policy.pdf'); // Correct way to load asset
+
+      final directory = await getApplicationDocumentsDirectory();
+      final filePath = '${directory.path}/privacy_policy.pdf';
+
+      final file = File(filePath);
+      await file.writeAsBytes(byteData.buffer.asUint8List());
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Privacy Policy downloaded successfully')),
+      );
+
+      await _openPdf(filePath);
+    } on PlatformException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('Error downloading Privacy Policy: ${e.message}')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to download Privacy Policy: $e')),
+      );
+    }
+  }
+
+  Future<void> _openPdf(String filePath) async {
+    try {
+      await OpenFilex.open(filePath);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to open Privacy Policy: $e')),
+      );
+    }
   }
 }

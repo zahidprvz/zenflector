@@ -22,7 +22,7 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
   late final AudioPlayer _audioPlayer = AudioPlayer();
   late AnimationController _animationController;
   late Animation<double> _playPauseAnimation;
-  bool _wasPlayingBeforePause = false; // ✅ Declared this variable
+  bool _wasPlayingBeforePause = false;
 
   // ✅ Custom clampDuration method
   Duration clampDuration(Duration value, Duration min, Duration max) {
