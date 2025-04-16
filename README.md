@@ -137,7 +137,3 @@ ZenFlector is a cross-platform mobile application (Android and iOS) built with F
 2.  Install dependencies: `npm install`
 3.  Ensure your Firebase configuration in `src/firebase.js` is correct.
 4.  Run the admin panel: `npm run dev`
-
-**Note:** Remember to replace placeholder values (app icon, privacy policy URL, terms of service URL, company name, etc.) with your actual information.  Also, the provided Privacy Policy and Terms of Service are *samples only* and should be reviewed and modified by a legal professional.
-
-This README provides a solid starting point for your GitHub repository.  It covers the key aspects of your project, making it easy for others (and your future self!) to understand and get started.  Good luck with ZenFlector!
